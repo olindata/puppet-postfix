@@ -1,44 +1,79 @@
-/*
-== Definition: postfix::transport
+#== Definition: postfix::transport
+#
+#Manages content of the /etc/postfix/transport map.
+#
+#Parameters:
+#- *name*: name of address postfix will lookup. See transport(5).
+#- *destination*: where the emails will be delivered to. See transport(5).
+#- *ensure*: present/absent, defaults to present.
+#
+#Requires:
+#- Class["postfix"]
+#- Postfix::Hash["/etc/postfix/transport"]
+#- Postfix::Config["transport_maps"]
+#- augeas
+#
+#Example usage:
+#
+#  node "toto.example.com" {
+#
+#    include postfix
+#
+#    postfix::hash { "/etc/postfix/transport":
+#      ensure => present,
+#    }
+#    postfix::config { "transport_maps":
+#      value => "hash:/etc/postfix/transport"
+#    }
+#    postfix::transport { "mailman.example.com":
+#      ensure      => present,
+#      destination => "mailman",
+#    }
+#  }
+#
+define postfix::transport (
+  $destination='',
+  $nexthop='',
+  $file='/etc/postfix/transport',
+  $ensure='present'
+) {
+  include postfix::augeas
 
-Manages content of the /etc/postfix/transport map.
+  case $ensure {
+    'present': {
+      if ($destination) {
+        $change_destination = "set pattern[. = '${name}']/transport '${destination}'"
+      } else {
+        $change_destination = "clear pattern[. = '${name}']/transport"
+      }
 
-Parameters:
-- *name*: name of address postfix will lookup. See transport(5).
-- *destination*: where the emails will be delivered to. See transport(5).
-- *ensure*: present/absent, defaults to present.
+      if ($nexthop) {
+        $change_nexthop = "set pattern[. = '${name}']/nexthop '${nexthop}'"
+      } else {
+        $change_nexthop = "clear pattern[. = '${name}']/nexthop"
+      }
 
-Requires:
-- Class["postfix"]
-- Postfix::Hash["/etc/postfix/transport"]
-- Postfix::Config["transport_maps"]
-- common::line (from module common)
-
-Example usage:
-
-  node "toto.example.com" {
-
-    include postfix
-
-    postfix::hash { "/etc/postfix/transport":
-      ensure => present,
+      $changes = [
+        "set pattern[. = '${name}'] '${name}'",
+        $change_destination,
+        $change_nexthop,
+      ]
     }
-    postfix::config { "transport_maps":
-      value => "hash:/etc/postfix/transport"
+
+    'absent': {
+      $changes = "rm pattern[. = '${name}']"
     }
-    postfix::transport { "mailman.example.com":
-      ensure      => present,
-      destination => "mailman",
+
+    default: {
+      fail("Wrong ensure value: ${ensure}")
     }
   }
 
-*/
-define postfix::transport ($ensure="present", $destination) {
-  common::line {"${name} ${destination}":
-    ensure => $ensure,
-    file   => "/etc/postfix/transport",
-    line   => "${name} ${destination}",
-    notify => Exec["generate /etc/postfix/transport.db"],
-    require => Package["postfix"],
+  augeas {"Postfix transport - ${name}":
+    lens    => 'Postfix_Transport.lns',
+    incl    => $file,
+    changes => $changes,
+    require => [Package['postfix'], Augeas::Lens['postfix_transport']],
+    notify  => Exec['generate /etc/postfix/transport.db'],
   }
 }
