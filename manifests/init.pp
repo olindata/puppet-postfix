@@ -23,39 +23,29 @@ class postfix (
   $postfix_use_dovecot_lda = "no",
   $postfix_use_schleuder   = "no",
   $postfix_use_sympa       = "no",
-  $postfix_mail_user       = "vmail",) {
-  # selinux labels differ from one distribution to another
+  $postfix_mail_user       = "vmail",
+  $myorigin                = $::fqdn) {
   case $::operatingsystem {
-
-    RedHat, CentOS: {
-      case $::lsbmajdistrelease {
-        '4':     { $postfix_seltype = 'etc_t' }
-        '5','6': { $postfix_seltype = 'postfix_etc_t' }
-        default: { $postfix_seltype = undef }
-      }
-    }
-
-    default        : {
-      $postfix_seltype = undef
-    }
-  }
-
-  package { "postfix": ensure => installed }
-
-
-  case $::operatingsystem {
-    /RedHat|CentOS|Fedora/: {
+    /RedHat|CentOS|Fedora/ : {
       $mailx_package = 'mailx'
-    }
-
-    /Debian|kFreeBSD/: {
-      $mailx_package = $::lsbdistcodename ? {
-        /lenny|etch|sarge/ => 'mailx',
-        default            => 'bsd-mailx',
+      $master_os_template = template('postfix/master.cf.redhat.erb', 'postfix/master.cf.common.erb')
+      case $::lsbmajdistrelease {
+        '4'      : { $postfix_seltype = 'etc_t' }
+        '5', '6' : { $postfix_seltype = 'postfix_etc_t' }
+        default  : { $postfix_seltype = undef }
       }
     }
 
-    'Ubuntu': {
+    /Debian|kFreeBSD/      : {
+      $mailx_package = $::lsbdistcodename ? {
+        /squeeze|lenny|etch|sarge/ => 'mailx',
+        default                    => 'bsd-mailx',
+      }
+      $master_os_template = template('postfix/master.cf.debian.erb', 'postfix/master.cf.common.erb')
+
+    }
+
+    'Ubuntu'               : {
       if (versioncmp('10', $::lsbmajdistrelease) > 0) {
         $mailx_package = 'mailx'
       } else {
@@ -64,14 +54,7 @@ class postfix (
     }
   }
 
-  $master_os_template = $::operatingsystem ? {
-    /RedHat|CentOS/          => template('postfix/master.cf.redhat.erb', 'postfix/master.cf.common.erb'),
-    /Debian|Ubuntu|kFreeBSD/ => template('postfix/master.cf.debian.erb', 'postfix/master.cf.common.erb'),
-  }
-
-  package { 'postfix':
-    ensure => installed,
-  }
+  package { 'postfix': ensure => installed, }
 
   package { 'mailx':
     ensure => installed,
@@ -135,29 +118,35 @@ class postfix (
   }
 
   # Default configuration parameters
-  $myorigin = $valid_fqdn ? {
-    ''      => $::fqdn,
-    default => $valid_fqdn,
-  }
   postfix::config {
-      'myorigin':         value => $myorigin;
-      'alias_maps':       value => 'hash:/etc/aliases';
-      'inet_interfaces':  value => 'all';
-    }
+    'myorigin':
+      value => $myorigin;
 
-    case $::operatingsystem {
-      RedHat, CentOS: {
-        postfix::config {
-          'sendmail_path':    value => '/usr/sbin/sendmail.postfix';
-          'newaliases_path':  value => '/usr/bin/newaliases.postfix';
-          'mailq_path':       value => '/usr/bin/mailq.postfix';
+    'alias_maps':
+      value => 'hash:/etc/aliases';
 
+    'inet_interfaces':
+      value => 'all';
+  }
+
+  case $::operatingsystem {
+    RedHat, CentOS : {
+      postfix::config {
+        'sendmail_path':
+          value => '/usr/sbin/sendmail.postfix';
+
+        'newaliases_path':
+          value => '/usr/bin/newaliases.postfix';
+
+        'mailq_path':
+          value => '/usr/bin/mailq.postfix';
       }
     }
-    default: {}
+    default        : {
+    }
   }
 
-  mailalias {'root':
+  mailalias { 'root':
     recipient => $root_mail_recipient,
     notify    => Exec['newaliases'],
   }
