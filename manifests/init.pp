@@ -29,6 +29,7 @@ class postfix (
     /RedHat|CentOS|Fedora/ : {
       $mailx_package = 'mailx'
       $master_os_template = template('postfix/master.cf.redhat.erb', 'postfix/master.cf.common.erb')
+
       case $::lsbmajdistrelease {
         '4'      : { $postfix_seltype = 'etc_t' }
         '5', '6' : { $postfix_seltype = 'postfix_etc_t' }
@@ -38,8 +39,9 @@ class postfix (
 
     /Debian|kFreeBSD/      : {
       $mailx_package = $::lsbdistcodename ? {
-        /squeeze|lenny|etch|sarge/ => 'mailx',
-        default                    => 'bsd-mailx',
+        /lenny|etch|sarge/ => 'mailx',
+        /squeeze/          => 'bsd-mailx',
+        default            => 'bsd-mailx',
       }
       $master_os_template = template('postfix/master.cf.debian.erb', 'postfix/master.cf.common.erb')
 
