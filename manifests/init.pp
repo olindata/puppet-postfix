@@ -15,51 +15,30 @@
 #     include postfix
 #   }
 #
-class postfix {
-
+class postfix (
+  $postfix_smtp_listen     = "127.0.0.1",
+  $root_mail_recipient     = "nobody",
+  $postfix_use_amavisd     = "no",
+  $postfix_use_dovecot_lda = "no",
+  $postfix_use_schleuder   = "no",
+  $postfix_use_sympa       = "no",
+  $postfix_mail_user       = "vmail",) {
   # selinux labels differ from one distribution to another
   case $::operatingsystem {
-
-    RedHat, CentOS: {
+    RedHat, CentOS : {
       case $::lsbmajdistrelease {
-        "4":     { $postfix_seltype = "etc_t" }
-        "5","6": { $postfix_seltype = "postfix_etc_t" }
-        default: { $postfix_seltype = undef }
+        "4"      : { $postfix_seltype = "etc_t" }
+        "5", "6" : { $postfix_seltype = "postfix_etc_t" }
+        default  : { $postfix_seltype = undef }
       }
     }
 
-    default: {
+    default        : {
       $postfix_seltype = undef
     }
   }
 
-  # Default value for various options
-  case $postfix_smtp_listen {
-    "": { $postfix_smtp_listen = "127.0.0.1" }
-  }
-  case $root_mail_recipient {
-    "":   { $root_mail_recipient = "nobody" }
-  }
-  case $postfix_use_amavisd {
-    "": { $postfix_use_amavisd = "no" }
-  }
-  case $postfix_use_dovecot_lda {
-    "": { $postfix_use_dovecot_lda = "no" }
-  }
-  case $postfix_use_schleuder {
-    "": { $postfix_use_schleuder = "no" }
-  }
-  case $postfix_use_sympa {
-    "": { $postfix_use_sympa = "no" }
-  }
-  case $postfix_mail_user {
-    "": { $postfix_mail_user = "vmail" }
-  }
-
-
-  package { "postfix":
-    ensure => installed
-  }
+  package { "postfix": ensure => installed }
 
   package { "mailx":
     ensure => installed,
@@ -86,11 +65,11 @@ class postfix {
 
   # Aliases
   file { "/etc/aliases":
-    ensure => present,
+    ensure  => present,
     content => "# file managed by puppet\n",
     replace => false,
     seltype => $postfix_seltype,
-    notify => Exec["newaliases"],
+    notify  => Exec["newaliases"],
   }
 
   # Aliases
@@ -104,11 +83,11 @@ class postfix {
   # Config files
   file { "/etc/postfix/master.cf":
     ensure  => present,
-    owner => "root",
-    group => "root",
-    mode => "0644",
+    owner   => "root",
+    group   => "root",
+    mode    => "0644",
     content => $::operatingsystem ? {
-      /RedHat|CentOS/ => template("postfix/master.cf.redhat.erb", "postfix/master.cf.common.erb"),
+      /RedHat|CentOS/          => template("postfix/master.cf.redhat.erb", "postfix/master.cf.common.erb"),
       /Debian|Ubuntu|kFreeBSD/ => template("postfix/master.cf.debian.erb", "postfix/master.cf.common.erb"),
     },
     seltype => $postfix_seltype,
@@ -119,9 +98,9 @@ class postfix {
   # Config files
   file { "/etc/postfix/main.cf":
     ensure  => present,
-    owner => "root",
-    group => "root",
-    mode => "0644",
+    owner   => "root",
+    group   => "root",
+    mode    => "0644",
     source  => "puppet:///modules/postfix/main.cf",
     replace => false,
     seltype => $postfix_seltype,
@@ -131,22 +110,32 @@ class postfix {
 
   # Default configuration parameters
   postfix::config {
-    "myorigin":   value => "${::fqdn}";
-    "alias_maps": value => "hash:/etc/aliases";
-    "inet_interfaces": value => "all";
+    "myorigin":
+      value => "${::fqdn}";
+
+    "alias_maps":
+      value => "hash:/etc/aliases";
+
+    "inet_interfaces":
+      value => "all";
   }
 
   case $::operatingsystem {
-    RedHat, CentOS: {
+    RedHat, CentOS : {
       postfix::config {
-        "sendmail_path": value => "/usr/sbin/sendmail.postfix";
-        "newaliases_path": value => "/usr/bin/newaliases.postfix";
-        "mailq_path": value => "/usr/bin/mailq.postfix";
+        "sendmail_path":
+          value => "/usr/sbin/sendmail.postfix";
+
+        "newaliases_path":
+          value => "/usr/bin/newaliases.postfix";
+
+        "mailq_path":
+          value => "/usr/bin/mailq.postfix";
       }
     }
   }
 
-  mailalias {"root":
+  mailalias { "root":
     recipient => $root_mail_recipient,
     notify    => Exec["newaliases"],
   }
