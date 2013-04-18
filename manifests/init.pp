@@ -17,7 +17,7 @@
 #   }
 #
 class postfix (
-  $postfix_smtp_listen     = "127.0.0.1",
+  $postfix_smtp_listen     = "127.0.0.1:",
   $root_mail_recipient     = "nobody",
   $postfix_use_amavisd     = "no",
   $postfix_use_dovecot_lda = "no",
